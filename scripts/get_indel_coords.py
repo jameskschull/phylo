@@ -5,7 +5,7 @@
 # This assumes that outgroup has no insertion - if they do, the results
 # may indicate a deletion in the query 
 
-# Next step: search same location in other query chains for gap
+# 
 
 import sys
 import subprocess 
