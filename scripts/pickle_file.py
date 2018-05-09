@@ -29,19 +29,20 @@ with open(file, 'r') as f:
 						# print "Adding chain"
 						return_dict[curr_chain_id] = curr_chain
 						curr_chain = []
-					# not first chain
 					curr_chain_id = line[12]
+					curr_chain.append(line)
+				else:
 					curr_chain.append(line)
 
 		return_dict[curr_chain_id] = curr_chain
 
-	elif filetype == 'insertion':
+	elif filetype == 'bed':
 
 		for line in f.readlines():
 
 			line = line.split()
 
-			return_dict[line[4]] = line
+			return_dict[line[4]].append(line)
 
 	pickle.dump(return_dict, out)
 				

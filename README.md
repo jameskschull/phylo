@@ -33,3 +33,20 @@ For mm10:
 join -1 4 -2 1 introns.sorted.bed.byID mm10.trimmed.chain_ids > introns.mm.bed
 309 681
 
+For monDom5:
+join -1 4 -2 1 introns.sorted.bed.byID monDom5.trimmed.chain_ids > introns.monDom.bed
+
+
+PICKLING:
+
+python pickle_file.py ../chains/mm10/hg38.mm10.all.chain 'chain'
+python pickle_file.py ../chains/canFam3/hg38.canFam3.all.chain 'chain'
+python pickle_file.py ../chains/monDom5/hg38.monDom5.all.chain 'chain'
+
+DELS:
+
+python get_indel_coords.py ../sorted/introns.can.bed.pickled ../chains/canFam3/hg38.canFam3.all.chain.pickled ../sorted/hg38insertions.vsCanFam3.bed
+
+python get_indel_coords.py ../sorted/introns.mm.bed.pickled ../chains/mm10/hg38.mm10.all.chain.pickled ../sorted/hg38.mm10.dels.bed
+
+python get_indel_coords.py ../sorted/introns.mm.bed.pickled ../chains/mm10/hg38.mm10.all.chain.pickled ../sorted/hg38insertions.vsmm10.bed
