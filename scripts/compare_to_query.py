@@ -13,6 +13,8 @@
 
 # Infile contains hg38 coordinates of insertion as well as the chainID mapping to 2nd query
 
+# python compare_to_query.py ../sorted/mm10/hg38plus_mm10minus.bed ../chains/canFam3/hg38.canFam3.all.chain.pickled ../sorted/evidence/hg38plus_mm10minus_canFam3plus.bed 'deletion'
+
 import sys
 import time
 import pickle
@@ -20,7 +22,7 @@ import edlib
 from Bio import SeqIO
 
 MARGIN = 5
-SIMILARITY_THRESHOLD = ?
+SIMILARITY_THRESHOLD = 0.7
 
 def querydel(infile, query2_chainfile, outfile):
 
@@ -83,13 +85,14 @@ def queryins(infile, query2_chainfile, outfile):
 	out = open(outfile, 'w')
 
 	insertions = pickle.load(open(infile, 'r'))
+	print "Loaded insertions file."
 	query2_chains = pickle.load(open(query2_chainfile, 'r'))
+	print "Loaded query2 chains."
 
 	query1_whole_genome = SeqIO.to_dict(SeqIO.parse('../wholegenomes/fasta/mm10.fa', 'fasta'))
+	print "Loaded query1 genome."
 	query2_whole_genome = SeqIO.to_dict(SeqIO.parse('../wholegenomes/fasta/canFam3.fa', 'fasta'))
-
-	print len(query1_whole_genome)
-	print len(query2_whole_genome)
+	print "Loaded query2 genome."
 
 	# For each chain
 	for i, key in enumerate(insertions.keys()):

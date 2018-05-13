@@ -3,76 +3,107 @@
 import pickle
 from collections import defaultdict
 import sys
+import time
+				
+def main():
 
-file = sys.argv[1]
-filetype = sys.argv[2]
-
-if filetype == 'chain':
-	num_chains_per_file = sys.argv[3] # last chain to pickle (exclusive)
-
-with open(file, 'r') as f:
+	file = sys.argv[1]
+	filetype = sys.argv[2]
 
 	if filetype == 'chain':
+		num_chains_per_file = int(sys.argv[3]) # last chain to pickle (exclusive)
 
-		file_no = 1
+	startTime = time.time()
+	with open(file, 'r') as f:
 
-		curr_chain_id = -1
-		curr_chain = []
-		num_chains = 0
+		print "Loaded chain file in {} seconds.".format((time.time() - startTime))
+		print "Creating outfiles with {} chains per file.".format(num_chains_per_file)
 
-		# initialize first file
-		out = open(file+".pickled{}".format(file_no), 'w')
-		return_dict = defaultdict(list)
+		if filetype == 'chain':
 
-		for line in f.readlines():
+			file_no = 1
 
-			# Ignore empty lines
-			if len(line.strip())==0: continue
+			curr_chain_id = -1
+			curr_chain = []
+			num_chains = 0
 
-			line = line.split()
+			# initialize first file
+			out = open(file+".pickled{}".format(file_no), 'w')
+			return_dict = defaultdict(list)
 
-			# Ignore commented lines
-			if line[0][0] != '#':
+			for line in f.readlines():
 
-				if line[0] == 'chain':
+				# Ignore empty lines
+				if len(line.strip())==0: continue
 
-					# if not first chain
-					if curr_chain_id > 0:
-						# print "Adding chain"
-						return_dict[curr_chain_id] = curr_chain
-						curr_chain = []
-						num_chains += 1
-						
-						# If we've reached designated limit, open new file
-						if num_chains == num_chains_per_file:
-							pickle.dump(return_dict, out)
-							file_no += 1
-							out.close()
-							out = open(file+".pickled{}".format(file_no), 'w')
-							return_dict = defaultdict(list)
+				line = line.split()
 
-					curr_chain_id = line[12]
-					curr_chain.append(line)
-				else:
-					curr_chain.append(line)
+				# Ignore commented lines
+				if line[0][0] != '#':
 
-		return_dict[curr_chain_id] = curr_chain
-		pickle.dump(return_dict, out)
+					if line[0] == 'chain':
 
-	elif filetype == 'bed':
+						# if not first chain
+						if curr_chain_id > 0:
+							# print "Adding chain."
+							return_dict[curr_chain_id] = curr_chain
+							curr_chain = []
+							num_chains += 1
 
-		out = open(file+".pickled", 'w')
+							# If we've reached designated limit, open new file
+							if num_chains == num_chains_per_file:
+								print "Chain limit reached, opening new file."
+								pickle.dump(return_dict, out)
+								out.close()
 
-		return_dict = defaultdict(list)
+								num_chains = 0 # reset count
+								file_no += 1
+								return_dict = defaultdict(list)
+								out = open(file+".pickled{}".format(file_no), 'w')
+								print "File number {} opened".format(file_no)		
 
-		for line in f.readlines():
+						curr_chain_id = line[12]
+						curr_chain.append(line)
+					else:
+						curr_chain.append(line)
 
-			line = line.split()
+			return_dict[curr_chain_id] = curr_chain
+			pickle.dump(return_dict, out)
 
-			return_dict[line[4]].append(line)
+		elif filetype == 'bed':
 
-		pickle.dump(return_dict, out)
-				
+			out = open(file+".pickled", 'w')
+
+			return_dict = defaultdict(list)
+
+			for line in f.readlines():
+
+				line = line.split()
+
+				return_dict[line[4]].append(line)
+
+			pickle.dump(return_dict, out)
+
+		# q1 deletions labelled with q2 chain IDs
+		elif filetype == 'q1dels':
+
+			out = open(file+".pickled", 'w')
+
+			return_dict = defaultdict(list)
+
+			for line in f.readlines():
+
+				line = line.split()
+
+				return_dict[line[7]].append(line)
+
+			pickle.dump(return_dict, out)
+
+
+	return 
+
+if __name__ == '__main__':
+	main()
 
 
 

@@ -64,6 +64,8 @@ def get_indel_coords(pickled_sites, pickled_chain, outfile, target):
 
 		for site in sites_dict[chain_id]:
 
+			ensemblID = site[0]
+
 			site_start = int(site[2])
 			site_end = int(site[3])
 
@@ -86,7 +88,7 @@ def get_indel_coords(pickled_sites, pickled_chain, outfile, target):
 				query_offset += gapless_block_size
 
 				# either insertion in reference or query
-				insertion_size = int(line[target_col]) 
+				insertion_size = int(line[target_col]) if len(line) > 1 else 0
 
 				# if there is an insertion of >= 50bp, record it
 				if insertion_size >= 50 and line[non_target_col] == '0':
@@ -102,10 +104,10 @@ def get_indel_coords(pickled_sites, pickled_chain, outfile, target):
 						insertion_end_ref = insertion_start_ref
 						insertion_end_query = insertion_start_query + insertion_size
 
-					out.write(str(insertion_size) + '\t' + chain[0][2] + '\t' +  str(insertion_start_ref) + '\t' + str(insertion_end_ref)  + '\t' + chain[0][7] + '\t' + str(insertion_start_query) + '\t' + str(insertion_end_query) + '\n')
+					out.write(ensemblID + '\t' + str(insertion_size) + '\t' + chain[0][2] + '\t' +  str(insertion_start_ref) + '\t' + str(insertion_end_ref)  + '\t' + chain[0][7] + '\t' + str(insertion_start_query) + '\t' + str(insertion_end_query) + '\n')
 
-				ref_offset += int(line[1])
-				query_offset += int(line[2])
+				ref_offset += int(line[1]) if len(line) > 1 else 0
+				query_offset += int(line[2]) if len(line) > 1 else 0
 							
 	return
 
