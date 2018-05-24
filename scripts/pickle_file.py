@@ -16,8 +16,9 @@ def main():
 	startTime = time.time()
 	with open(file, 'r') as f:
 
-		print "Loaded chain file in {} seconds.".format((time.time() - startTime))
-		print "Creating outfiles with {} chains per file.".format(num_chains_per_file)
+		if filetype == 'chain':
+			print "Loaded chain file in {} seconds.".format((time.time() - startTime))
+			print "Creating outfiles with {} chains per file.".format(num_chains_per_file)
 
 		if filetype == 'chain':
 
@@ -28,7 +29,7 @@ def main():
 			num_chains = 0
 
 			# initialize first file
-			out = open(file+".pickled{}".format(file_no), 'w')
+			out = open("pickled/"+file+".{}".format(file_no), 'w')
 			return_dict = defaultdict(list)
 
 			for line in f.readlines():
