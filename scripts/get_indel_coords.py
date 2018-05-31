@@ -22,33 +22,18 @@ import time
 import pickle
 from collections import defaultdict
 
-## DEBUGGING ##
+def get_indels(sites_dict, chain_dict, outfile, target, target_col, non_target_col):
 
-# python get_indel_coords.py ../sorted/mm10/introns.mm.bed.pickled ../chains/mm10/hg38.mm10.all.chain.pickled ../sorted/mm10/hg38plus_mm10minus.bed 'deletion'
-# python get_indel_coords.py ../sorted/canFam3/introns.can.bed.pickled ../chains/canFam3/hg38.canFam3.all.chain.pickled ../sorted/canFam3/hg38plus_canFam3minus.bed 'deletion'
-
-# OPTIMIZATIONS TO IMPLEMENT:
-# - Only search chain once for each sites_dict[chainID]
-# - Parallelize by splitting into multiple chains
-
-# Call with pickled_sites, pickled_chain, outfile, target (either 
-# 'deletion' or 'insertion').
-
-def get_indel_coords(sites_dict, chain_dict, outfile, target):
+	# initialize variables for para
+	insertion_start_ref = -1
+	insertion_start_query = -1
+	insertion_end_ref = -1
+	insertion_end_query = -1
 
 	print "Getting query {}s.".format(target)
 	
 	print "Writing results to {}.".format(outfile)
 	out = open(outfile, 'w')
-
-	# contains column of gap we're looking for
-	if target=="deletion":
-
-		target_col = 1
-		non_target_col = 2
-	elif target=="insertion":
-		target_col = 2
-		non_target_col = 1
 
 	chain_ids = sites_dict.keys()
 	num_chains = len(chain_ids)
@@ -64,6 +49,8 @@ def get_indel_coords(sites_dict, chain_dict, outfile, target):
 
 		chain = chain_dict.get(chain_id, None)
 
+		# print "CHAIN ID: {}".format(chain_id)
+
 		if chain == None: 
 			print 'Chain not found!'
 			continue
@@ -72,9 +59,6 @@ def get_indel_coords(sites_dict, chain_dict, outfile, target):
 		query_start = int(chain[0][10])
 
 		for site in sites_dict[chain_id]:
-
-			print "Searching coordinates of new site: \n"
-			print site
 
 			ensemblID = site[0]
 
@@ -113,27 +97,27 @@ def get_indel_coords(sites_dict, chain_dict, outfile, target):
 					insertion_start_query = query_start + query_offset
 
 					# insertion start/end is same coord for 'deletion' genome
-					if target=="deletion":
+					if target==0: #deletion
 						insertion_end_ref = insertion_start_ref + insertion_size
 						insertion_end_query = insertion_start_query
-					elif target=="insertion":
+					elif target==1: #insertion
 						insertion_end_ref = insertion_start_ref
 						insertion_end_query = insertion_start_query + insertion_size
 
 					entry = ensemblID + '\t' + str(insertion_size) + '\t' + chain[0][2] + '\t' +  str(insertion_start_ref) + '\t' + str(insertion_end_ref)  + '\t' + chain[0][7] + '\t' + chain[0][9] + '\t' + str(insertion_start_query) + '\t' + str(insertion_end_query) + '\n'
 					found_sites.add(entry)
 					num_sites_found += 1
-					print(entry)
-					print line
+					# print(entry)
+					# print line
 
 				ref_offset += int(line[1]) if len(line) > 1 else 0
 				query_offset += int(line[2]) if len(line) > 1 else 0
 
 		print "Search completed. {} sites found.".format(num_sites_found)
 
-	print "These are the unique sites found: '\n"
+	# print "These are the unique sites found: '\n"
 	for site in found_sites:
-		print site
+		# print site
 		out.write(site)
 							
 	return
@@ -166,15 +150,25 @@ def get_chain_dict(chainfile, sites_dict):
 	print "Loading chains."
 	begin_chainload = time.time()
 
+	# strings
 	chainIDs = sites_dict.keys()
-	print "Num chain IDs: {}".format(len(chainIDs))
-	maxID = max(sorted(chainIDs))
+	# print "Num chain IDs: {}".format(len(chainIDs))
+	# print "ChainIDs to load: {}.".format(chainIDs)
+
+	maxID = str(max([int(chainID) for chainID in chainIDs]))
+	# print "Max ID to load: {}.".format(maxID)
+
+	minID = str(min([int(chainID) for chainID in chainIDs]))
+	# print "Min ID to load: {}.".format(minID)
+
+	foundFirstChain = False
 	loadedAllChains = False
 
 	with open(chainfile, 'r') as f:
 
 		chain_dict = defaultdict(list)
 
+		# Initialize 'current chain'
 		curr_chain_id = -1
 		curr_chain = []
 		num_chains = 0
@@ -183,12 +177,27 @@ def get_chain_dict(chainfile, sites_dict):
 
 			line = [word.strip() for word in line.split()]
 
-			if len(line) == 0: continue # ignore blank line at end of each chain
+			# ignore comments and blank line at end of each chain
+			if len(line) == 0 or line[0].startswith('#'): continue 
 
-			if line[0] == 'chain':
+			################ Deal with line ################
 
-				# if not first chain
-				if curr_chain_id > 0:
+			# Only start building dict once reached min chainID
+			if foundFirstChain == False: 
+
+				# Set to true once we've reached our first relevant chain
+				if line[0] == 'chain' and line[12] == minID:
+					foundFirstChain = True
+					curr_chain_id = line[12]
+				else:
+					continue
+
+			# In relevant section of chain files
+			else:
+
+				if line[0] == 'chain':
+
+					# Add loaded chain to dictionary
 					chain_dict[curr_chain_id] = curr_chain
 					curr_chain = []
 
@@ -197,15 +206,18 @@ def get_chain_dict(chainfile, sites_dict):
 						loadedAllChains = True
 						break			
 
-				curr_chain_id = line[12]
+					curr_chain_id = line[12]
 
 			curr_chain.append(line)
+
+			################ Move to next line ################
 
 		# Edge case: maxID is last ID in file
 		if not loadedAllChains: chain_dict[curr_chain_id] = curr_chain
 
 		print "Loaded chains in {} minutes.\n".format((time.time() - begin_chainload)/60)
 
+		# print "Loaded these keys: {}.".format(sorted(chain_dict.keys()))
 		return chain_dict
 
 def main():
@@ -213,8 +225,12 @@ def main():
 	sitesfile = sys.argv[1]
 	chainfile = sys.argv[2]
 	outfile = sys.argv[3]
-	target = sys.argv[4]
+	target = int(sys.argv[4])
 	start = int(sys.argv[5])
+
+	# TARGET:
+	# 1 is insertion
+	# 0 is deletion
 
 	# Load sites
 	if len(sys.argv)==7:
@@ -222,18 +238,23 @@ def main():
 	else:
 		end = float('inf')
 
-	name_parts = chainfile.replace('/', '.').split('.')
+	target_col = 1000
+	non_target_col = 2000
 
-	# Build outfile name
-	outfile = name_parts[5] + '.' + name_parts[6] + '.' + target + '.' + str(start) + '-' + str(end) + '.txt'
-	
+	# contains column of gap we're looking for
+	if target==0:
+		target_col = 1
+		non_target_col = 2
+	elif target==1:
+		target_col = 2
+		non_target_col = 1
+
 	sites_dict = get_sites_dict(sitesfile, start, end)
 
 	# Load chains
 	chain_dict = get_chain_dict(chainfile, sites_dict)
 
-	
-	get_indel_coords(sites_dict, chain_dict, outfile, target)
+	get_indels(sites_dict, chain_dict, outfile, target, target_col, non_target_col)
 
 	return
 
