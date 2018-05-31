@@ -20,7 +20,7 @@
 import sys
 import time
 import pickle
-# import edlib
+import edlib
 from Bio import SeqIO
 from collections import defaultdict
 
@@ -262,11 +262,11 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			print "Mouse coordinates (from site): {}: {}-{} (strand: {})".format(q1_chr, q1_start, q1_end, q1_strand)
 
 			# GET Q2 SEQUENCE
-			ref_position = int(site[3]) # since this is an insertion, ref start and end are the same
+			ref_ins_position = int(site[3]) # since this is an insertion, ref start and end are the same
 			print "Human insertion start position: {}".format(ref_position)
 
-			ref_left = ref_position - ref_chain_start # bp to ref start point
-			q2_curr = q2_chain_start
+			ref_left = ref_ins_position - ref_chain_start # bp to ref start point
+			q2_curr_coord = q2_chain_start
 
 			for line in chain[1:]:
 
@@ -274,22 +274,22 @@ def double_insertion(sites_dict, chain_dict, outfile):
 				if len(line) < 3: break
 
 				gapless_block_size = int(line[0])
-				ref_block_size = int(line[1])
-				query_block_size = int(line[2])
+				query_gap_size = int(line[1])
+				ref_gap_size = int(line[2])
 
-				if ref_left - gapless_block_size < 0:
-					q2_start = q2_curr + ref_left
+				if ref_left - gapless_block_size <= 0:
+					q2_start = q2_curr_coord + ref_left
 					break
 
 				ref_left -= gapless_block_size
-				q2_curr += gapless_block_size
+				q2_curr_coord += gapless_block_size
 
-				if ref_left - ref_block_size < 0:
-					q2_start = q2_curr + ref_left
+				if ref_left - query_gap_size <= 0:
+					q2_start = q2_curr_coord + ref_left
 					break
 
-				ref_left -= ref_block_size
-				q2_curr += query_block_size
+				ref_left -= query_gap_size
+				q2_curr_coord += ref_gap_size
 
 			q2_seq = query2_whole_genome[q2_chr][q2_start:q2_start + insertion_size]
 
@@ -308,14 +308,14 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			# Calculate similarity
 			len_longer_seq = max(len(q1_seq), len(q2_seq))
 
-			# similarity = (len_longer_seq - int(edlib.align(q1_seq, q2_seq)["editDistance"]))/float(len_longer_seq)
+			similarity = (len_longer_seq - int(edlib.align(q1_seq, q2_seq)["editDistance"]))/float(len_longer_seq)
 
 			# compare to threshold, write if they're similar enough
-			if similarity > THRESHOLD:
-				print "Sites have similarity of {}: evidence found!".format(similarity)
-				out.write('\t'.join(site) + '\n')
+			if similarity > UPPER_THRESHOLD:
+				print "Sites have similarity of {}: evidence found! \n".format(similarity)
+				out.write('\t'.join(site) + '\t' + 'similarity: {}'.format(round(similarity, 2)) + '\n')
 			else:
-				print "Sites have similarity of {}: insufficient.".format(similarity)
+				print "Sites have similarity of {}: insufficient. \n".format(similarity)
 
 	return
 
