@@ -240,56 +240,60 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			print "Chain not found!"
 			continue
 
-		q2_chr = chain[0][7]
-		q2_strand = chain[0][9]
-		q2_chain_start = int(chain[0][10])
-		ref_chain_start = int(chain[0][5])
-		
 		# For each insertion that maps to that chain
 		for site in sites_dict[chain_id]:
 
 			print '\t'.join(site)
 
+			ref_curr_coord = int(chain[0][5]) # ref chain start
+			ref_ins_position = int(site[3]) # since this is an insertion, ref start and end are the same
 			insertion_size = int(site[1])
 
-			# GET Q1 SEQUENCE
-			q1_chr = site[5]
-			q1_strand = site[6]
-			q1_start = int(site[7])
-			q1_end = int(site[8])
+			### GET Q1 SEQUENCE ###
+			q1_chr, q1_strand, q1_start, q1_end = site[5], site[6], int(site[7]), int(site[8])
 			q1_seq = query1_whole_genome[q1_chr][q1_start:q1_end]
 
-			print "Mouse coordinates (from site): {}: {}-{} (strand: {})".format(q1_chr, q1_start, q1_end, q1_strand)
+			#######################
 
-			# GET Q2 SEQUENCE
-			ref_ins_position = int(site[3]) # since this is an insertion, ref start and end are the same
-			print "Human insertion start position: {}".format(ref_position)
-
-			ref_left = ref_ins_position - ref_chain_start # bp to ref start point
-			q2_curr_coord = q2_chain_start
+			### GET Q2 SEQUENCE ###
+			
+			q2_curr_coord = int(chain[0][10]) # q2 chain start
+			q2_chr, q2_strand, q2_start, q2_end = chain[0][7], chain[0][9], None, None 
 
 			for line in chain[1:]:
-
-				#if on last chain line, break
-				if len(line) < 3: break
 
 				gapless_block_size = int(line[0])
 				query_gap_size = int(line[1])
 				ref_gap_size = int(line[2])
 
-				if ref_left - gapless_block_size <= 0:
-					q2_start = q2_curr_coord + ref_left
+				# Case 1: still before ref insertion start
+				if ref_curr_coord + gapless_block_size < ref_ins_position - MARGIN:
+					
+					ref_curr_coord += gapless_block_size
+					q2_curr_coord += gapless_block_size
+
+				# Case 2: viable insertion found
+				elif (ref_ins_position - MARGIN <= ref_curr_coord + gapless_block_size <= ref_ins_position + MARGIN
+					 and query_gap_size == 0 and ref_gap_size > 0):
+
+					q2_start = q2_curr_coord + gapless_block_size
+					q2_end = q2_start + insertion_size
 					break
 
-				ref_left -= gapless_block_size
-				q2_curr_coord += gapless_block_size
-
-				if ref_left - query_gap_size <= 0:
-					q2_start = q2_curr_coord + ref_left
+				# Case 3: move beyond insertion start
+				elif ref_curr_coord + gapless_block_size > ref_ins_position:
 					break
 
-				ref_left -= query_gap_size
+				# Account for gaps
+				ref_curr_coord += query_gap_size
 				q2_curr_coord += ref_gap_size
+
+			#######################
+
+			# Viable insertion wasn't found
+			if q2_start is None: 
+				print "No viable insertion found."
+				continue
 
 			q2_seq = query2_whole_genome[q2_chr][q2_start:q2_start + insertion_size]
 
@@ -310,7 +314,7 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 			similarity = (len_longer_seq - int(edlib.align(q1_seq, q2_seq)["editDistance"]))/float(len_longer_seq)
 
-			# compare to threshold, write if they're similar enough
+			# Compare to threshold, write if they're similar enough
 			if similarity > UPPER_THRESHOLD:
 				print "Sites have similarity of {}: evidence found! \n".format(similarity)
 				out.write('\t'.join(site) + '\t' + 'similarity: {}'.format(round(similarity, 2)) + '\n')
