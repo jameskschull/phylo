@@ -28,6 +28,28 @@ MARGIN = 5
 UPPER_THRESHOLD = 0.8 
 LOWER_THRESHOLD = 0.7
 
+mm_chrom_sizes= {'chr1'	: 195471971,
+'chr2':	182113224,
+'chrX':	171031299,
+'chr3':	160039680,
+'chr4':	156508116,
+'chr5':	151834684,
+'chr6':	149736546,
+'chr7':	145441459,
+'chr10':	130694993,
+'chr8':	129401213,
+'chr14':	124902244,
+'chr9':	124595110,
+'chr11':	122082543,
+'chr13':	120421639,
+'chr12':	120129022,
+'chr15':	104043685,
+'chr16':	98207768,
+'chr17':	94987271,
+'chrY':	91744698,
+'chr18':	90702639,
+'chr19':	61431566}
+
 # for filtering outgroup
 def search_for_q2_deletions(sites_dict, chain_dict, outfile):
 
@@ -243,7 +265,7 @@ def double_insertion(sites_dict, chain_dict, outfile):
 		# For each insertion that maps to that chain
 		for site in sites_dict[chain_id]:
 
-			print '\t'.join(site)
+			# print '\t'.join(site)
 
 			ref_curr_coord = int(chain[0][5]) # ref chain start
 			ref_ins_position = int(site[3]) # since this is an insertion, ref start and end are the same
@@ -251,6 +273,7 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 			### GET Q1 SEQUENCE ###
 			q1_chr, q1_strand, q1_start, q1_end = site[5], site[6], int(site[7]), int(site[8])
+			q1_chrom_size = mm_chrom_sizes[q1_chr]
 			q1_seq = query1_whole_genome[q1_chr][q1_start:q1_end]
 
 			#######################
@@ -258,7 +281,7 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			### GET Q2 SEQUENCE ###
 			
 			q2_curr_coord = int(chain[0][10]) # q2 chain start
-			q2_chr, q2_strand, q2_start, q2_end = chain[0][7], chain[0][9], None, None 
+			q2_chr, q2_chrom_size, q2_strand, q2_start, q2_end = chain[0][7], int(chain[0][8]), chain[0][9], None, None 
 
 			for line in chain[1:]:
 
@@ -274,14 +297,14 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 				# Case 2: viable insertion found
 				elif (ref_ins_position - MARGIN <= ref_curr_coord + gapless_block_size <= ref_ins_position + MARGIN
-					 and query_gap_size == 0 and ref_gap_size > 0):
+					 and query_gap_size == 0 and ref_gap_size > 10):
 
 					q2_start = q2_curr_coord + gapless_block_size
 					q2_end = q2_start + insertion_size
 					break
 
 				# Case 3: move beyond insertion start
-				elif ref_curr_coord + gapless_block_size > ref_ins_position:
+				elif ref_curr_coord + gapless_block_size > ref_ins_position + MARGIN:
 					break
 
 				# Account for gaps
@@ -294,20 +317,26 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			if q2_start is None: 
 				print "No viable insertion found."
 				continue
-
-			q2_seq = query2_whole_genome[q2_chr][q2_start:q2_start + insertion_size]
-
+			
 			# Account for strand 
-			if q2_strand == '-':
-				q2_seq = q2_seq.reverse_complement()
-
 			if q1_strand == '-':
-				q1_seq = q1_seq.reverse_complement()
+				q1_forward_start = q1_chrom_size - q1_end
+				q1_forward_end = q1_chrom_size - q1_start
+				q1_seq = query1_whole_genome[q1_chr][q1_forward_start:q1_forward_end].reverse_complement()
+			elif q1_strand == '+':
+				q1_seq = query1_whole_genome[q1_chr][q1_start:q1_end]
+
+			if q2_strand == '-':
+				q2_forward_start = q2_chrom_size - q2_end
+				q2_forward_end = q2_chrom_size - q2_start
+				q2_seq = query2_whole_genome[q2_chr][q2_forward_start:q2_forward_end].reverse_complement()
+			elif q2_strand == '+':
+				q2_seq = query2_whole_genome[q2_chr][q2_start:q2_end]
 
 			q1_seq, q2_seq = str(q1_seq), str(q2_seq)
 
-			print "Mouse sequence: {}".format(q1_seq)
-			print "Dog sequence: {}".format(q2_seq)
+			# print "Mouse sequence: {}".format(q1_seq)
+			# print "Dog sequence: {}".format(q2_seq)
 
 			# Calculate similarity
 			len_longer_seq = max(len(q1_seq), len(q2_seq))
@@ -317,6 +346,9 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			# Compare to threshold, write if they're similar enough
 			if similarity > UPPER_THRESHOLD:
 				print "Sites have similarity of {}: evidence found! \n".format(similarity)
+				print '\t'.join(site) + '\n'
+				print "Mouse sequence: {}".format(q1_seq)
+				print "Dog sequence: {}".format(q2_seq)
 				out.write('\t'.join(site) + '\t' + 'similarity: {}'.format(round(similarity, 2)) + '\n')
 			else:
 				print "Sites have similarity of {}: insufficient. \n".format(similarity)
