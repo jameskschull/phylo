@@ -1,27 +1,27 @@
 # Removes from BED file all HAP/Un/etc chroms
 import sys
 
-def rename_chroms(index, infile, outfile):
+def rename_chroms(infile, outfile):
 
 	with open(infile, 'r') as f:
 
 		out = open(outfile, 'w')
 
-		lines = [line.split(",") for line in f.readlines()]
+		lines = [line.split() for line in f.readlines()]
 
 		# X chr = 23
 		# Y chr = 24
 		for line in lines:
-			chrn = line[0][index:] 
+			chrn = line[0][3:] 
 
 			if len(line[0]) <= 5:
 
 				if chrn == 'X':
-					out.write('chr23' + '\t' + '\t'.join(line[1:4]))
+					out.write('chr23' + '\t' + '\t'.join(line[1:4]) + '\n')
 				elif chrn == 'Y':
-					out.write('chr24' + '\t' + '\t'.join(line[1:4]))
+					out.write('chr24' + '\t' + '\t'.join(line[1:4]) + '\n')
 				else:
-					out.write('chr' + chrn + '\t' + '\t'.join(line[1:4]))
+					out.write('chr' + chrn + '\t' + '\t'.join(line[1:4]) + '\n')
 
 def clean_target_file(infile, outfile):
 
@@ -40,12 +40,14 @@ def clean_target_file(infile, outfile):
 
 def main():
 
-	argv = sys.argv[1:]
-	filename = argv[1]
-	outfilename = argv[2]
+	mode = sys.argv[1]
+	filename = sys.argv[2]
+	outfilename = sys.argv[3]
 
-	if argv[0] == 'clean':
+	if mode == 'clean':
 		clean_target_file(filename, outfilename)
+	elif mode == 'rename':
+		rename_chroms(filename, outfilename)
 
 	# for TES
 	#rename_chroms(3, '../unprocessed/hg38_TEs.bed', '../processed/hg38_TEs_proc.bed')

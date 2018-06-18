@@ -19,6 +19,7 @@ from collections import defaultdict
 
 INS_THRESHOLD = 0.7
 MARGIN = 5
+L_MARGIN = 10
 
 def ref_deletion_find_insertion(sites_dict, chain_dict, outfile):
 
@@ -124,11 +125,14 @@ def ref_deletion_find_insertion(sites_dict, chain_dict, outfile):
 def ref_deletion_find_deletion(sites_dict, chain_dict, outfile):
 
 	print "Reference deletion, finding deletions in query2."
+	print 'Margin: {}'.format(L_MARGIN)
 	out = open(outfile, 'w')
 	results = set([])
 
 	# For each chain
 	for chain_id in sites_dict.keys():
+
+		print chain_id 
 
 		chain = chain_dict.get(chain_id, None)
 		if chain is None: 
@@ -143,6 +147,8 @@ def ref_deletion_find_deletion(sites_dict, chain_dict, outfile):
 			ref_curr_coord = int(chain[0][5]) # ref chain start
 			ref_ins_position = int(site[3])
 
+			print "Insertion position: {}".format(ref_ins_position)
+
 			#### SEARCH CHAIN ####
 
 			for line in chain[1:]:
@@ -155,20 +161,21 @@ def ref_deletion_find_deletion(sites_dict, chain_dict, outfile):
 				query_gap_size = int(line[1])
 				ref_gap_size = int(line[2])
 
-				print "Current coordinate: {}. Insertion coordinate: {}. Gapless size: {}. Query gap size: {}".format(ref_curr_coord, ref_ins_position, gapless_block_size, query_gap_size)
+				# print "Current coordinate: {}. Insertion coordinate: {}. Gapless size: {}. Query gap size: {}".format(ref_curr_coord, ref_ins_position, gapless_block_size, query_gap_size)
 
 				# Case 1: still before ref insertion start
-				if ref_curr_coord + gapless_block_size < ref_ins_position - MARGIN:	
+				if ref_curr_coord + gapless_block_size < ref_ins_position - L_MARGIN:	
 					ref_curr_coord += gapless_block_size
 
 				# Case 2: deletion found
-				elif ref_curr_coord <= ref_ins_position - MARGIN and ref_curr_coord + gapless_block_size >= ref_ins_position + MARGIN:
+				elif ref_curr_coord <= ref_ins_position - L_MARGIN and ref_curr_coord + gapless_block_size >= ref_ins_position + L_MARGIN and ref_gap_size == 0:
 					print "Found a deletion!"
+					print "GAPLESS: {}, RCC: {}, RCC + GAPLESS: {}".format(gapless_block_size, ref_curr_coord, ref_curr_coord + gapless_block_size)
 					results.add('\t'.join(site) + '\n')
 					break
 
 				# Case 3: move beyond insertion range
-				elif ref_curr_coord > ref_ins_position + MARGIN:
+				elif ref_curr_coord > ref_ins_position + L_MARGIN:
 					print "No deletion found..."
 					break
 
@@ -180,6 +187,7 @@ def ref_deletion_find_deletion(sites_dict, chain_dict, outfile):
 
 	return
 
+
 def ref_insertion_find_insertion(sites_dict, chain_dict, outfile):
 
 	out = open(outfile, 'w')
@@ -187,7 +195,7 @@ def ref_insertion_find_insertion(sites_dict, chain_dict, outfile):
 
 	ref_whole_genome = SeqIO.to_dict(SeqIO.parse('/cluster/u/jschull/phylo/wholegenomes/fasta/hg38.fa', 'fasta'))
 	print "Loaded reference genome."
-	query2_whole_genome = SeqIO.to_dict(SeqIO.parse('/cluster/u/jschull/phylo/wholegenomes/fasta/canFam3.fa', 'fasta'))
+	query2_whole_genome = SeqIO.to_dict(SeqIO.parse('/cluster/u/jschull/phylo/wholegenomes/fasta/mm10.fa', 'fasta'))
 	print "Loaded query2 genome."
 
 	# For each chain
@@ -223,10 +231,11 @@ def ref_insertion_find_insertion(sites_dict, chain_dict, outfile):
 				query_gap_size = int(line[1])
 				ref_gap_size = int(line[2])
 
+				# print 'RCC: {}. Insertion start: {}. Gapless size: {}.'.format(ref_curr_coord, ref_ins_start, gapless_block_size)
 				## Deal with gapless block ##
 
 				# Insertion start contained in gapless block
-				if ref_curr_coord <= ref_ins_start and ref_curr_coord + gapless_block_size >= ref_ins_start:
+				if ref_curr_coord - MARGIN <= ref_ins_start and ref_curr_coord + gapless_block_size + MARGIN >= ref_ins_start:
 
 					q2_start = q2_curr_coord + (ref_curr_coord + gapless_block_size - ref_ins_start)
 					q2_end = q2_start + insertion_size
@@ -237,8 +246,10 @@ def ref_insertion_find_insertion(sites_dict, chain_dict, outfile):
 
 				## Deal with gaps ##
 
+				# print 'RCC: {}. Insertion start: {}. Query gap size: {}.'.format(ref_curr_coord, ref_ins_start, query_gap_size)
+
 				# Insertion start contained in query gap
-				if ref_curr_coord <= ref_ins_start and ref_curr_coord + query_gap_size >= ref_ins_start:
+				if ref_curr_coord  - MARGIN <= ref_ins_start and ref_curr_coord + query_gap_size + MARGIN >= ref_ins_start:
 
 					q2_start = q2_curr_coord 
 					q2_end = q2_start + insertion_size
@@ -249,6 +260,9 @@ def ref_insertion_find_insertion(sites_dict, chain_dict, outfile):
 
 			#######################
 			
+			# Didn't find insertion range
+			if q2_start == None or q2_end == None: continue
+
 			q1_forward_start, q1_forward_end, q2_forward_start, q2_forward_end = None, None, None, None
 
 			# Account for strand 
@@ -331,10 +345,16 @@ def ref_insertion_find_deletion(sites_dict, chain_dict, outfile):
 	return
 
 
-def get_sites_dict(sitesfile, start, end):
+def get_sites_dict(sitesfile, start, end, mode):
 
 	print "Loading sites."
 	sites_dict = defaultdict(list)
+
+	if mode == 'dd':
+		col = 18
+	elif mode == 'ii':
+		col = 12
+
 
 	with open(sitesfile, 'r') as f:
 		
@@ -350,7 +370,9 @@ def get_sites_dict(sitesfile, start, end):
 
 			if len(line) == 2: continue
 
-			sites_dict[line[9]].append(line)
+			sites_dict[line[col]].append(line)
+
+			print line[col]
 
 	print "Sites loaded. \n"
 	return sites_dict
@@ -439,7 +461,7 @@ def main():
 	else:
 		end = float('inf')
 
-	sites_dict = get_sites_dict(sitesfile, start, end)
+	sites_dict = get_sites_dict(sitesfile, start, end, mode)
 	chain_dict = get_chain_dict(chainfile, sites_dict)
 
 	if mode == 'di':

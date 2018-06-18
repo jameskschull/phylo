@@ -26,7 +26,7 @@ from collections import defaultdict
 
 MARGIN = 5
 UPPER_THRESHOLD = 0.8 
-LOWER_THRESHOLD = 0.7
+LOWER_THRESHOLD = 0.1
 
 mm_chrom_sizes= {'chr1'	: 195471971,
 'chr2':	182113224,
@@ -158,6 +158,8 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 			ref_ins_start, ref_ins_end = int(site[3]), int(site[4]) # reference coords of insertion
 			gapless_bp, gap_bp = 0, 0 # number of bp within insertion range that are gapless/gap
 
+			# print "RCC: {}, RIN: {}, RIE: {}".format(ref_curr_coord, ref_ins_start, ref_ins_end)
+
 			################ SEARCH CHAIN ################
 
 			for line in chain[1:]:
@@ -168,6 +170,7 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 
 				gapless_block_size = int(line[0])
 				query_gap_size = int(line[1])
+				ref_gap_size = int(line[2])
 
 				# If moved past insertion, stop search
 				if rangeOver == True:
@@ -185,6 +188,13 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 							if i == 0: 
 								gapless_bp += ref_curr_coord + block_size - ref_ins_start
 							elif i == 1:
+
+								# Ignore if there's a double-sided gap
+								if ref_gap_size > 0:
+									gapless_bp, gap_bp = 0, 0
+									rangeOver = True
+									break
+
 								gap_bp += ref_curr_coord + block_size - ref_ins_start
 
 						# ii): whole insertion range is contained within block
@@ -193,6 +203,13 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 							if i == 0:
 								gapless_bp += ref_ins_end - ref_ins_start
 							elif i == 1:
+
+								# Ignore if there's a double-sided gap
+								if ref_gap_size > 0:
+									gapless_bp, gap_bp = 0, 0
+									rangeOver = True
+									break
+
 								gap_bp += ref_ins_end - ref_ins_start
 							
 
@@ -204,6 +221,13 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 							if i == 0:
 								gapless_bp += block_size
 							elif i == 1:
+
+								# Ignore if there's a double-sided gap
+								if ref_gap_size > 0:
+									gapless_bp, gap_bp = 0, 0
+									rangeOver = True
+									break
+
 								gap_bp += block_size
 
 						# ii) rest of insertion range is contained within block:
@@ -212,6 +236,13 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 							if i == 0:
 								gapless_bp += ref_ins_end - ref_curr_coord
 							elif i == 1:
+
+								# Ignore if there's a double-sided gap
+								if ref_gap_size > 0:
+									gapless_bp, gap_bp = 0, 0
+									rangeOver = True
+									break
+									
 								gap_bp += ref_ins_end - ref_curr_coord
 
 					if rangeOver == False:
@@ -247,7 +278,7 @@ def compare_to_q2_chain(sites_dict, chain_dict, outfile, mode):
 def double_insertion(sites_dict, chain_dict, outfile):
 
 	out = open(outfile, 'w')
-	print "Writing evidence to {}/.".format(outfile)
+	print "Writing evidence to {}".format(outfile)
 
 	query1_whole_genome = SeqIO.to_dict(SeqIO.parse('/cluster/u/jschull/phylo/wholegenomes/fasta/mm10.fa', 'fasta'))
 	print "Loaded query1 genome."
@@ -267,6 +298,8 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 			# print '\t'.join(site)
 
+			final_line = None
+
 			ref_curr_coord = int(chain[0][5]) # ref chain start
 			ref_ins_position = int(site[3]) # since this is an insertion, ref start and end are the same
 			insertion_size = int(site[1])
@@ -274,7 +307,6 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			### GET Q1 SEQUENCE ###
 			q1_chr, q1_strand, q1_start, q1_end = site[5], site[6], int(site[7]), int(site[8])
 			q1_chrom_size = mm_chrom_sizes[q1_chr]
-			q1_seq = query1_whole_genome[q1_chr][q1_start:q1_end]
 
 			#######################
 
@@ -284,6 +316,8 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			q2_chr, q2_chrom_size, q2_strand, q2_start, q2_end = chain[0][7], int(chain[0][8]), chain[0][9], None, None 
 
 			for line in chain[1:]:
+
+				if len(line) < 3: continue
 
 				gapless_block_size = int(line[0])
 				query_gap_size = int(line[1])
@@ -297,10 +331,11 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 				# Case 2: viable insertion found
 				elif (ref_ins_position - MARGIN <= ref_curr_coord + gapless_block_size <= ref_ins_position + MARGIN
-					 and query_gap_size == 0 and ref_gap_size > 10):
+					 and query_gap_size == 0 and ref_gap_size > 0):
 
 					q2_start = q2_curr_coord + gapless_block_size
-					q2_end = q2_start + insertion_size
+					q2_end = q2_start + ref_gap_size
+					final_line = line
 					break
 
 				# Case 3: move beyond insertion start
@@ -315,9 +350,11 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 			# Viable insertion wasn't found
 			if q2_start is None: 
-				print "No viable insertion found."
+				# print "No viable insertion found."
 				continue
 			
+			q1_forward_start, q1_forward_end, q2_forward_start, q2_forward_end = None, None, None, None
+
 			# Account for strand 
 			if q1_strand == '-':
 				q1_forward_start = q1_chrom_size - q1_end
@@ -333,7 +370,7 @@ def double_insertion(sites_dict, chain_dict, outfile):
 			elif q2_strand == '+':
 				q2_seq = query2_whole_genome[q2_chr][q2_start:q2_end]
 
-			q1_seq, q2_seq = str(q1_seq), str(q2_seq)
+			q1_seq, q2_seq = str(q1_seq.seq), str(q2_seq.seq)
 
 			# print "Mouse sequence: {}".format(q1_seq)
 			# print "Dog sequence: {}".format(q2_seq)
@@ -343,15 +380,11 @@ def double_insertion(sites_dict, chain_dict, outfile):
 
 			similarity = (len_longer_seq - int(edlib.align(q1_seq, q2_seq)["editDistance"]))/float(len_longer_seq)
 
+			print "SIMILARITY: {}".format(similarity)
+
 			# Compare to threshold, write if they're similar enough
-			if similarity > UPPER_THRESHOLD:
-				print "Sites have similarity of {}: evidence found! \n".format(similarity)
-				print '\t'.join(site) + '\n'
-				print "Mouse sequence: {}".format(q1_seq)
-				print "Dog sequence: {}".format(q2_seq)
-				out.write('\t'.join(site) + '\t' + 'similarity: {}'.format(round(similarity, 2)) + '\n')
-			else:
-				print "Sites have similarity of {}: insufficient. \n".format(similarity)
+			if similarity > 0.6:
+				out.write('\t'.join(site) + '\t' + 'similarity: {}'.format(round(similarity, 2)) + '\t' + 'canStrand: {}'.format(q2_strand) + '\t' + 'mouseBEDcoords: {}-{}'.format(q1_forward_start, q1_forward_end) + '\t' + 'dogBEDcoords: {}-{}'.format(q2_forward_start, q2_forward_end) + '\n')
 
 	return
 
@@ -373,7 +406,10 @@ def get_sites_dict(sitesfile, start, end):
 
 			line = line.split()
 
-			sites_dict[line[len(line) - 1]].append(line)
+			if len(line) == 2: continue
+
+			# CHANGE THIS WHEN NEEDED
+			sites_dict[line[12]].append(line)
 
 	print "Sites loaded. \n"
 	return sites_dict
