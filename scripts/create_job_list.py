@@ -11,7 +11,7 @@
 #python create_job_list.py 'compare' '../results/outgroupLabels/hg38+.mm10-.canFam3+.txt.loxAfr3ID' '../chains/loxAfr3/hg38.loxAfr3.all.chain' 'results/hg38+.mm10-.canFam3+.loxAfr3-' '/cluster/u/jschull/phylo/jobs/evidence/mm10del_canFam3ins_loxAfr3del_job/mm10del_canFam3ins_loxAfr3del' 2 50
 #python create_job_list.py 'compare' '../sorted/loxAfr3/hg38.mm10.dels.canFam3.ins.txt.loxAfr3ID' '../chains/loxAfr3/hg38.loxAfr3.all.chain' 'results/hg38.mm10del.canFam3ins.loxAfr3del' '/cluster/u/jschull/phylo/jobs/evidence/mm10del_canFam3ins_loxAfr3del_job/mm10del_canFam3ins_loxAfr3del' 2 50
 # python create_job_list.py 'compare' '../results/edlib_method/hg38+.mm10-.canFam3+.txt_edlib.loxAfr3ID' '../chains/loxAfr3/hg38.loxAfr3.all.chain' 'results/hg38+.mm10-.canFam3+.loxAfr3-' '/cluster/u/jschull/phylo/jobs/evidence/mm10del_canFam3ins_loxAfr3del_job/mm10del_canFam3ins_loxAfr3del 2 200
-#python create_job_list.py 'compare' '../results/edlib_method/hg38+.canFam3-.mm10+.txt_edlib.loxAfr3ID' '../chains/loxAfr3/hg38.loxAfr3.all.chain' 'results/hg38+.canFam3-.mm10+.loxAfr3-' '/cluster/u/jschull/phylo/jobs/evidence/canFam3del_mm10ins_loxAfr3del_job/canFam3del_mm10ins_loxAfr3del' 2 200
+#
 
 # For generate_results:
 # python create_job_list.py 'results' '../results/outgroupLabels/hg38-.mm10+.canFam3+.txt.loxAfr3ID' '../chains/loxAfr3/hg38.loxAfr3.all.chain' 'results/hg38-.mm10+.canFam3+.loxAfr3-' '/cluster/u/jschull/phylo/jobs/evidence/hg38del_mm10ins_canFam3ins_loxAfr3del_job/hg38del_mm10ins_canFam3ins_loxAfr3del 'dd' 100
@@ -32,11 +32,9 @@ type_of_search = sys.argv[6]
 lines_per_job = int(sys.argv[7])
 
 if script_type == 'indels':
-	script = 'get_indel_coords.py'
-elif script_type == 'compare':
-	script = 'compare_to_query_copy.py'
-elif script_type == 'results':
-	script = 'generate_results.py'
+	script = 'get_indels.py'
+elif script_type == 'evidence':
+	script = 'generate_evidence.py'
 
 sitesfile = '/cluster/u/jschull/phylo/' + '/'.join(sitesfile_name.split('/')[1:])
 chainfile = '/cluster/u/jschull/phylo/' + '/'.join(chainfile_name.split('/')[1:])
