@@ -6,7 +6,13 @@ The aim is to build this pipeline such that given n species, evidence for all pe
 
 The following sections describe the stages in the pipeline. 
 
-## Step 1: Label introns with chainIDs
+## Directories
+
+
+
+## Pipeline
+
+### Step 1: Label introns with chainIDs
 
 The first step is to label the introns file with the chainIDs of the species in which we wish to find insertions or deletions. These chainIDs, and the chain files themselves, all refer to chains mapping between the chosen reference species and each respective query species (e.g. hg38.mm10.all.chain, in which case hg38 is the reference and mm10 is the query). 
 
@@ -22,7 +28,7 @@ To label this file, we use a simple join. For example, to label it with canFam3 
 join -1 4 -2 1 introns.byID.bed ../chains/canFam3/canFam3.trimmed.chain_ids > canFam3/introns.canFam3.bed
 ```
 
-## Step 2: Find query1 deletions/insertions
+### Step 2: Find query1 deletions/insertions
 
 This step of the pipeline generates files containing sites of the form (ref +, query -) or (ref -, query +). We refer to the first case as a *deletion*, and the second as an *insertion*. To generate these files, we use the script **get_indels.py**; however, in order to parallelize the process with parasol, we use an intermediate script **create_job_list.py** to create a list of jobs that call get_indels.py.
 
@@ -60,7 +66,7 @@ Running these jobs will create files of the following format (which can be conca
 ENSEMBL_ID, INSERTION SIZE, REF CHROM, REF START, REF END, QUERY CHROM, QUERY STRAND, QUERY START, QUERY END
 
 
-## Step 3: Generate evidence
+### Step 3: Generate evidence
 
 The final step is to use the files containing insertions/deletions to compare to all the *other* queries, and generate the final evidence. This step uses the scripts **create_job_list.py** to quickly generate jobfiles for submission to parasol, and **generate_evidence.py** to actually compare the sites to the relevant queries.
 
